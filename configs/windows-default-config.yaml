@@ -1,0 +1,57 @@
+# Configuration OpenTelemetry pour SmartSentry Agent sur Windows
+# Cette config collecte les métriques système de base
+
+receivers:
+  # Collecteur de métriques système Windows
+  hostmetrics:
+    collection_interval: 15s  # Collecte toutes les 15 secondes
+    scrapers:
+      cpu: {}              # Métriques CPU
+      memory: {}           # Métriques mémoire
+      disk: {}             # Métriques disque
+      network: {}          # Métriques réseau
+      filesystem: {}       # Métriques système de fichiers
+      load: {}             # Load average (si disponible)
+      paging: {}           # Métriques de pagination/swap
+      #processes: {}        # Métriques de processus (nombre, durée, état)
+  
+  # Collecteur spécifique Windows (optionnel)
+  windowsperfcounters:
+    collection_interval: 30s
+    perfcounters:
+      - object: "Processor"
+        instances: ["_Total"]
+        counters:
+          - name: "% Processor Time"
+            metric: "cpu.utilization"
+      - object: "Memory"
+        counters:
+          - name: "Available Bytes"
+            metric: "memory.available"
+
+processors:
+  # Regroupe les métriques par batch pour optimiser l'envoi
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+exporters:
+  # Export vers SmartSentry Gateway via protocole OTLP HTTP
+  otlphttp:
+    # REMPLACE cette URL par celle de ton SmartSentry Gateway
+    endpoint: http://192.168.1.18:4318
+    tls:
+      insecure: true  # OK pour un lab, HTTPS recommandé en prod
+  
+  # Export additionnel pour debug (optionnel)
+  logging:
+    loglevel: info
+
+service:
+  # Pipeline de traitement des métriques
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, windowsperfcounters]
+      processors: [batch]
+      exporters: [otlphttp]
+      # Décommente pour debug : exporters: [otlphttp, logging]

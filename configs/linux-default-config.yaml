@@ -1,0 +1,43 @@
+# Configuration OpenTelemetry pour SmartSentry Agent sur Linux
+# Cette config collecte les métriques système de base
+
+receivers:
+  # Collecteur de métriques système (CPU, mémoire, disque, réseau)
+  hostmetrics:
+    collection_interval: 15s  # Collecte toutes les 15 secondes
+    scrapers:
+      cpu: {}              # Métriques CPU (utilisation par core, load average)
+      memory: {}           # Métriques mémoire (utilisée, disponible, cache)
+      disk: {}             # Métriques disque (I/O, espace utilisé)
+      network: {}          # Métriques réseau (bytes in/out, erreurs)
+      filesystem: {}       # Métriques système de fichiers (espace libre)
+      load: {}             # Load average système
+      paging: {}           # Métriques de pagination/swap
+      #processes: {}        # Métriques de processus (nombre, durée, état)
+
+processors:
+  # Regroupe les métriques par batch pour optimiser l'envoi
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+exporters:
+  # Export vers SmartSentry Gateway via protocole OTLP HTTP
+  otlphttp:
+    # REMPLACE cette URL par celle de ton SmartSentry Gateway
+    endpoint: http://192.168.1.18:4318
+    tls:
+      insecure: true  # OK pour un lab, HTTPS recommandé en prod
+  
+  # Export additionnel pour debug (optionnel)
+  logging:
+    loglevel: info
+
+service:
+  # Pipeline de traitement des métriques
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]    # Entrée : métriques système
+      processors: [batch]        # Traitement : regroupement
+      exporters: [otlphttp]      # Sortie : vers SmartSentry
+      # Décommente pour debug : exporters: [otlphttp, logging]

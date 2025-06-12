@@ -1,0 +1,30 @@
+# Template de service systemd pour SmartSentry Agent
+# Ce fichier sera copié dans /etc/systemd/system/ lors de l'installation
+
+[Unit]
+Description=SmartSentry Observability Agent
+Documentation=https://github.com/Arceuid731/smartsentry-agent
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=smartsentry                                    # Utilisateur dédié (créé lors de l'install)
+Group=smartsentry                                   # Groupe dédié
+ExecStart=/usr/local/bin/otelcol-contrib --config=/etc/smartsentry-agent/config.yaml
+Restart=always                                      # Redémarre automatiquement en cas de crash
+RestartSec=5                                       # Attend 5s avant redémarrage
+
+# Sécurité renforcée
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/smartsentry-agent          # Seul répertoire en écriture autorisé
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=smartsentry-agent
+
+[Install]
+WantedBy=multi-user.target                         # Démarre automatiquement au boot
