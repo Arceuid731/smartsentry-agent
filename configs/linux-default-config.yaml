@@ -13,7 +13,6 @@ receivers:
       filesystem: {}       # Métriques système de fichiers (espace libre)
       load: {}             # Load average système
       paging: {}           # Métriques de pagination/swap
-      #processes: {}        # Métriques de processus (nombre, durée, état)
 
 processors:
   # Regroupe les métriques par batch pour optimiser l'envoi
@@ -25,13 +24,15 @@ exporters:
   # Export vers SmartSentry Gateway via protocole OTLP HTTP
   otlphttp:
     # REMPLACE cette URL par celle de ton SmartSentry Gateway
-    endpoint: http://192.168.1.18:4318
+    endpoint: http://REMPLACE-PAR-IP-GATEWAY:30080
     tls:
       insecure: true  # OK pour un lab, HTTPS recommandé en prod
   
   # Export additionnel pour debug (optionnel)
-  logging:
-    loglevel: info
+  debug:
+    verbosity: normal
+    sampling_initial: 2
+    sampling_thereafter: 500
 
 service:
   # Pipeline de traitement des métriques
@@ -40,4 +41,4 @@ service:
       receivers: [hostmetrics]    # Entrée : métriques système
       processors: [batch]        # Traitement : regroupement
       exporters: [otlphttp]      # Sortie : vers SmartSentry
-      # Décommente pour debug : exporters: [otlphttp, logging]
+      # Décommente pour debug : exporters: [otlphttp, debug]

@@ -44,8 +44,10 @@ exporters:
       insecure: true  # OK pour un lab, HTTPS recommandé en prod
   
   # Export additionnel pour debug (optionnel)
-  logging:
-    loglevel: info
+  debug:
+    verbosity: normal
+    sampling_initial: 2
+    sampling_thereafter: 500
 
 service:
   # Pipeline de traitement des métriques
