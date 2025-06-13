@@ -1,44 +1,60 @@
 # Configuration OpenTelemetry pour SmartSentry Agent sur Linux
-# Cette config collecte les métriques système de base
+# Enrichie avec les attributs de ressource nécessaires
 
 receivers:
-  # Collecteur de métriques système (CPU, mémoire, disque, réseau)
   hostmetrics:
-    collection_interval: 15s  # Collecte toutes les 15 secondes
+    collection_interval: 15s
     scrapers:
-      cpu: {}              # Métriques CPU (utilisation par core, load average)
-      memory: {}           # Métriques mémoire (utilisée, disponible, cache)
-      disk: {}             # Métriques disque (I/O, espace utilisé)
-      network: {}          # Métriques réseau (bytes in/out, erreurs)
-      filesystem: {}       # Métriques système de fichiers (espace libre)
-      load: {}             # Load average système
+      cpu: {}              # Métriques CPU
+      memory: {}           # Métriques mémoire
+      disk: {}             # Métriques disque
+      network: {}          # Métriques réseau
+      filesystem: {}       # Métriques système de fichiers
+      load: {}             # Load average (si disponible)
       paging: {}           # Métriques de pagination/swap
+      #processes: {}        # Métriques de processus (nombre, durée, état)
 
 processors:
-  # Regroupe les métriques par batch pour optimiser l'envoi
+  # NOUVEAU: Détecte automatiquement les attributs de l'hôte
+  # Il ajoutera des attributs comme host.name, os.type, etc.
+  resourcedetection:
+    detectors: [system] # 'system' détecte le FQDN, l'OS, etc.
+    override: true # Remplace les attributs existants si conflit
+
+  # NOUVEAU: Ajoute des attributs statiques pour identifier la source
+  # C'est CRUCIAL pour l'exportateur prometheusremotewrite.
+  resource:
+    attributes:
+      - key: service.name
+        value: "smartsentry.agent.linux" # Identifiant du service
+        action: insert
+      - key: service.instance.id
+        value: ${env:HOSTNAME} # Utilise une variable d'environnement pour un ID unique
+        action: insert
+
+  # Le batch processor reste essentiel pour l'efficacité
   batch:
     timeout: 10s
     send_batch_size: 1024
 
 exporters:
-  # Export vers SmartSentry Gateway via protocole OTLP HTTP
   otlphttp:
-    # REMPLACE cette URL par celle de ton SmartSentry Gateway
     endpoint: http://REMPLACE-PAR-IP-GATEWAY:30080
     tls:
-      insecure: true  # OK pour un lab, HTTPS recommandé en prod
+      insecure: true
   
-  # Export additionnel pour debug (optionnel)
+  # L'exportateur de debug sur l'agent peut être utile pour vérifier
   debug:
     verbosity: normal
-    sampling_initial: 2
-    sampling_thereafter: 500
 
 service:
   # Pipeline de traitement des métriques
   pipelines:
     metrics:
-      receivers: [hostmetrics]    # Entrée : métriques système
-      processors: [batch]        # Traitement : regroupement
-      exporters: [otlphttp]      # Sortie : vers SmartSentry
-      # Décommente pour debug : exporters: [otlphttp, debug]
+      receivers: [hostmetrics]
+      # ORDRE IMPORTANT: Enrichir les ressources d'abord, puis batcher.
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlphttp]
+      # Décommentez la ligne suivante sur l'agent pour vérifier que les attributs
+      # sont bien ajoutés avant l'envoi :
+      # exporters: [otlphttp, debug]
