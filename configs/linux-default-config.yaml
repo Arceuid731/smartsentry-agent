@@ -1,38 +1,39 @@
 # Configuration OpenTelemetry pour SmartSentry Agent sur Linux
-# Enrichie avec les attributs de ressource nécessaires
+# Version corrigée et fiabilisée
 
 receivers:
   hostmetrics:
     collection_interval: 15s
     scrapers:
-      cpu: {}              # Métriques CPU
-      memory: {}           # Métriques mémoire
-      disk: {}             # Métriques disque
-      network: {}          # Métriques réseau
-      filesystem: {}       # Métriques système de fichiers
-      load: {}             # Load average (si disponible)
-      paging: {}           # Métriques de pagination/swap
-      #processes: {}        # Métriques de processus (nombre, durée, état)
+      cpu: {}
+      memory: {}
+      disk: {}
+      network: {}
+      filesystem: {}
+      load: {}
+      paging: {}
 
 processors:
-  # NOUVEAU: Détecte automatiquement les attributs de l'hôte
-  # Il ajoutera des attributs comme host.name, os.type, etc.
+  # Étape 1: Détecte automatiquement les attributs de l'hôte (comme host.name)
   resourcedetection:
-    detectors: [system] # 'system' détecte le FQDN, l'OS, etc.
-    override: true # Remplace les attributs existants si conflit
+    detectors: [system]
+    override: true
 
-  # NOUVEAU: Ajoute des attributs statiques pour identifier la source
-  # C'est CRUCIAL pour l'exportateur prometheusremotewrite.
+  # Étape 2: Ajoute et modifie des attributs de ressource de manière fiable
   resource:
     attributes:
+      # Action 1: Insère un nom de service statique. C'est toujours une bonne pratique.
       - key: service.name
-        value: "smartsentry.agent.linux" # Identifiant du service
+        value: "smartsentry.agent.linux"
         action: insert
+      
+      # Action 2 (MODIFIÉE): Insère un ID d'instance en copiant la valeur de l'attribut 'host.name'
+      # qui a été détecté à l'étape précédente. C'est beaucoup plus robuste que ${env:HOSTNAME}.
       - key: service.instance.id
-        value: ${env:HOSTNAME} # Utilise une variable d'environnement pour un ID unique
+        from_attribute: "host.name"
         action: insert
 
-  # Le batch processor reste essentiel pour l'efficacité
+  # Étape 3: Regroupe en lots pour l'efficacité
   batch:
     timeout: 10s
     send_batch_size: 1024
@@ -43,18 +44,17 @@ exporters:
     tls:
       insecure: true
   
-  # L'exportateur de debug sur l'agent peut être utile pour vérifier
-  debug:
-    verbosity: normal
+  # L'exportateur de debug reste utile pour la validation
+  # debug:
+  #   verbosity: normal
 
 service:
   # Pipeline de traitement des métriques
   pipelines:
     metrics:
       receivers: [hostmetrics]
-      # ORDRE IMPORTANT: Enrichir les ressources d'abord, puis batcher.
+      # L'ordre est crucial : 1. Détecter, 2. Enrichir, 3. Batcher
       processors: [resourcedetection, resource, batch]
       exporters: [otlphttp]
-      # Décommentez la ligne suivante sur l'agent pour vérifier que les attributs
-      # sont bien ajoutés avant l'envoi :
+      # Décommentez pour un debug complet sur l'agent :
       # exporters: [otlphttp, debug]
