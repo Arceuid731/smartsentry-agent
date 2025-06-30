@@ -38,8 +38,8 @@ processors:
 exporters:
   # Export vers SmartSentry Gateway via protocole OTLP HTTP
   otlphttp:
-    # REMPLACE cette URL par celle de ton SmartSentry Gateway
-    endpoint: http://192.168.1.18:4318
+    # Endpoint SmartSentry Gateway via MetalLB LoadBalancer
+    endpoint: http://192.168.1.211:4318
     tls:
       insecure: true  # OK pour un lab, HTTPS recommandé en prod
   
