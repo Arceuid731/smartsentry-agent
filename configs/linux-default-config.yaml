@@ -1,5 +1,5 @@
 # Configuration OpenTelemetry pour SmartSentry Agent sur Linux
-# Version DÉFINITIVE avec enrichissement et debug corrects
+# Version ENRICHIE avec filtres précis et inventaire matériel détaillé
 
 receivers:
   hostmetrics:
@@ -8,20 +8,42 @@ receivers:
       cpu: {}
       memory: {}
       disk: {}
-      network: {}
-      filesystem: {}
+      filesystem:
+        # Filtre pour ne garder que les FS pertinents (évite tmpfs, squashfs, etc.)
+        include_fs_types:
+          match_type: strict
+          fs_types: [ "ext4", "xfs", "btrfs", "zfs" ]
+      network:
+        # Inclut toutes les interfaces physiques (adapter selon infra)
+        include:
+          match_type: regexp
+          interfaces: [ "^(eth|enp|ens|eno|wlan|bond|br|docker).*" ]
       load: {}
       paging: {}
-      process: {}
+      process:
+        # Collecte fine par process (nécessite droits sur /proc)
+        resource_attributes:
+          process.owner:
+            enabled: true
+        metrics:
+          process.memory.usage:
+            enabled: true
+          process.disk.io:
+            enabled: true
+        mute_process_name_error: true
+        mute_process_exe_error: true
+        mute_process_io_error: true
       processes: {}
+      # Scraper TCP connections (si supporté par ta version OTel)
+      tcp_connections: {}
 
 processors:
-  # Étape 1: Détecte automatiquement les attributs de l'hôte
+  # Étape 1: Détecte automatiquement les attributs de l'hôte et environnement
   resourcedetection:
-    detectors: [system]
+    detectors: [system, env]
     override: true
 
-  # Étape 2: Ajoute et copie des attributs de ressource de manière fiable
+  # Étape 2: Enrichissement complet des attributs de ressource
   resource:
     attributes:
       - key: service.name
@@ -30,6 +52,32 @@ processors:
       - key: service.instance.id
         from_attribute: "host.name"
         action: insert
+      # Enrichissement inventaire matériel
+      - key: host.name
+        from_attribute: "host.name"
+        action: upsert
+      - key: host.id
+        from_attribute: "host.id"
+        action: upsert
+      - key: host.arch
+        from_attribute: "host.arch"
+        action: upsert
+      - key: os.type
+        from_attribute: "os.type"
+        action: upsert
+      - key: os.version
+        from_attribute: "os.version"
+        action: upsert
+      - key: host.cpu.logical.count
+        from_attribute: "host.cpu.logical.count"
+        action: upsert
+      - key: host.cpu.physical.count
+        from_attribute: "host.cpu.physical.count"
+        action: upsert
+      - key: host.memory.total
+        from_attribute: "host.memory.total"
+        action: upsert
+      # Ajoute d'autres attributs d'inventaire si exposés par OTel
 
   # Étape 3: Regroupe en lots
   batch:
@@ -42,14 +90,14 @@ exporters:
     tls:
       insecure: true
 
-  # L'exportateur de DEBUG CORRECT avec la bonne verbosité
+  # Exportateur de debug pour validation
   debug:
-    verbosity: detailed # "detailed" est essentiel pour voir les attributs
+    verbosity: detailed
 
 service:
-  # Le pipeline qui applique ENFIN les processeurs correctement
+  # Pipeline enrichi avec détection avancée et inventaire
   pipelines:
     metrics:
       receivers: [hostmetrics]
       processors: [resourcedetection, resource, batch]
-      exporters: [otlphttp, debug] # On active le debug pour valider
+      exporters: [otlphttp, debug]

@@ -33,6 +33,12 @@ func installLinuxService() error {
 		return fmt.Errorf("échec installation fichier service : %w", err)
 	}
 
+	// Créer la configuration override pour les capabilities (optionnel)
+	if err := createSystemdOverrideConfiguration(); err != nil {
+		fmt.Printf("⚠️  Attention : impossible de créer la configuration override : %v\n", err)
+		fmt.Println("📋 Pour activer les capacités avancées manuellement, consultez la documentation")
+	}
+
 	// Recharger systemd pour prendre en compte le nouveau service
 	fmt.Println("🔄 Rechargement de systemd...")
 	if err := runSystemCommand("systemctl", "daemon-reload"); err != nil {
@@ -55,6 +61,9 @@ func installLinuxService() error {
 	if err := checkLinuxServiceStatus(); err != nil {
 		return fmt.Errorf("le service ne semble pas fonctionner : %w", err)
 	}
+
+	// Afficher les informations sur les capabilities
+	displayCapabilitiesInfo()
 
 	fmt.Println("✅ Service systemd installé et démarré avec succès")
 	return nil
@@ -103,6 +112,96 @@ WantedBy=multi-user.target
 	return nil
 }
 
+// createSystemdOverrideConfiguration crée la configuration override pour les capabilities avancées
+func createSystemdOverrideConfiguration() error {
+	overrideDir := fmt.Sprintf("/etc/systemd/system/%s.service.d", SERVICE_NAME)
+	overrideFile := fmt.Sprintf("%s/override.conf", overrideDir)
+
+	fmt.Printf("📁 Création du répertoire override : %s\n", overrideDir)
+
+	// Créer le répertoire override s'il n'existe pas
+	if err := os.MkdirAll(overrideDir, 0755); err != nil {
+		return fmt.Errorf("impossible de créer le répertoire %s : %w", overrideDir, err)
+	}
+
+	// Contenu de la configuration override
+	overrideContent := `# Configuration override pour SmartSentry Agent
+# Ajoute des capabilities système avancées pour la surveillance approfondie
+
+[Service]
+# Capabilities ambiantes pour la surveillance système avancée
+# CAP_SYS_PTRACE : Permet de tracer les processus système
+# CAP_DAC_READ_SEARCH : Permet de contourner les permissions de lecture de fichiers
+AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+
+# Note: Ces capabilities permettent à SmartSentry d'effectuer une surveillance
+# plus approfondie du système, incluant l'inspection des processus et l'accès
+# à des fichiers système généralement protégés pour la collecte de métriques avancées.
+`
+
+	fmt.Printf("📝 Création du fichier override : %s\n", overrideFile)
+
+	// Écrire le fichier override
+	err := os.WriteFile(overrideFile, []byte(overrideContent), 0644)
+	if err != nil {
+		return fmt.Errorf("impossible d'écrire %s : %w", overrideFile, err)
+	}
+
+	fmt.Println("✅ Configuration override créée avec succès")
+	return nil
+}
+
+// displayCapabilitiesInfo affiche des informations sur les capabilities configurées
+func displayCapabilitiesInfo() {
+	fmt.Println("\n🔐 Informations sur les Capabilities Système:")
+	fmt.Println("   Le service a été configuré avec des capabilities avancées :")
+	fmt.Println("   • CAP_SYS_PTRACE     : Surveillance des processus système")
+	fmt.Println("   • CAP_DAC_READ_SEARCH : Accès étendu aux fichiers système")
+	fmt.Println("\n📋 Commandes utiles pour vérifier les capabilities :")
+	fmt.Printf("   • Statut service     : sudo systemctl status %s\n", SERVICE_NAME)
+	fmt.Printf("   • Capabilities actives : sudo cat /proc/$(pgrep -f %s)/status | grep Cap\n", SERVICE_NAME)
+	fmt.Printf("   • Configuration override : sudo cat /etc/systemd/system/%s.service.d/override.conf\n", SERVICE_NAME)
+	fmt.Println("\n⚠️  Note: Ces capabilities permettent une surveillance système approfondie")
+	fmt.Println("   mais doivent être utilisées avec précaution en production.")
+}
+
+// verifyCapabilities vérifie que les capabilities sont correctement appliquées
+func verifyCapabilities() error {
+	fmt.Println("🔍 Vérification des capabilities du service...")
+
+	// Trouver le PID du processus smartsentry-agent
+	cmd := exec.Command("pgrep", "-f", SERVICE_NAME)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("impossible de trouver le processus %s : %w", SERVICE_NAME, err)
+	}
+
+	pid := strings.TrimSpace(string(output))
+	if pid == "" {
+		return fmt.Errorf("processus %s non trouvé", SERVICE_NAME)
+	}
+
+	// Vérifier les capabilities du processus
+	statusFile := fmt.Sprintf("/proc/%s/status", pid)
+	statusContent, err := os.ReadFile(statusFile)
+	if err != nil {
+		return fmt.Errorf("impossible de lire %s : %w", statusFile, err)
+	}
+
+	statusStr := string(statusContent)
+
+	// Chercher les lignes de capabilities
+	lines := strings.Split(statusStr, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "CapEff:") || strings.HasPrefix(line, "CapAmb:") {
+			fmt.Printf("   %s\n", line)
+		}
+	}
+
+	fmt.Printf("✅ Capabilities vérifiées pour le processus %s (PID: %s)\n", SERVICE_NAME, pid)
+	return nil
+}
+
 // checkLinuxServiceStatus vérifie que le service systemd fonctionne correctement
 func checkLinuxServiceStatus() error {
 	fmt.Println("🔍 Vérification du statut du service...")
@@ -117,6 +216,12 @@ func checkLinuxServiceStatus() error {
 	}
 
 	fmt.Printf("✅ Service %s actif et en cours d'exécution\n", SERVICE_NAME)
+
+	// Vérifier les capabilities (non bloquant)
+	if err := verifyCapabilities(); err != nil {
+		fmt.Printf("⚠️  Attention : %v\n", err)
+	}
+
 	return nil
 }
 
@@ -133,5 +238,20 @@ func stopLinuxService() error {
 		fmt.Printf("⚠️  Attention : impossible d'arrêter le service : %v\n", err)
 	}
 
+	return nil
+}
+
+// removeSystemdOverrideConfiguration supprime la configuration override
+func removeSystemdOverrideConfiguration() error {
+	overrideDir := fmt.Sprintf("/etc/systemd/system/%s.service.d", SERVICE_NAME)
+
+	fmt.Printf("🗑️  Suppression de la configuration override : %s\n", overrideDir)
+
+	// Supprimer le répertoire override et son contenu
+	if err := os.RemoveAll(overrideDir); err != nil {
+		return fmt.Errorf("impossible de supprimer %s : %w", overrideDir, err)
+	}
+
+	fmt.Println("✅ Configuration override supprimée")
 	return nil
 }

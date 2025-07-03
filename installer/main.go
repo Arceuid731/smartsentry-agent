@@ -84,6 +84,10 @@ func printServiceInstructions() {
 		fmt.Printf("  • Redémarrer  : sudo systemctl restart %s\n", SERVICE_NAME)
 		fmt.Printf("  • Logs        : sudo journalctl -u %s -f\n", SERVICE_NAME)
 		fmt.Printf("  • Désinstaller: sudo systemctl stop %s && sudo systemctl disable %s\n", SERVICE_NAME, SERVICE_NAME)
+		fmt.Printf("\n🔐 Commandes pour les capabilities système :\n")
+		fmt.Printf("  • Vérifier capabilities : sudo cat /proc/$(pgrep -f %s)/status | grep Cap\n", SERVICE_NAME)
+		fmt.Printf("  • Configuration override : sudo cat /etc/systemd/system/%s.service.d/override.conf\n", SERVICE_NAME)
+		fmt.Printf("  • Recharger configuration: sudo systemctl daemon-reload && sudo systemctl restart %s\n", SERVICE_NAME)
 	case "windows":
 		fmt.Printf("  • Statut      : sc query \"%s\"\n", SERVICE_NAME)
 		fmt.Printf("  • Arrêter     : sc stop \"%s\"\n", SERVICE_NAME)
