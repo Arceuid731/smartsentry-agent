@@ -1,0 +1,35 @@
+# Binaires compilés
+build/
+
+# Fichiers temporaires
+*.tmp
+*.temp
+*.log
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Fichiers d'environnement
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dossiers temporaires
+tmp/
+temp/
