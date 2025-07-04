@@ -87,27 +87,27 @@ func promptForGatewayURL() (string, error) {
 	fmt.Println("Entrez l'adresse de votre SmartSentry Gateway (ex: http://192.168.1.211:4318)")
 	fmt.Println("Cette adresse correspond à l'IP de votre cluster k3s avec le port NodePort du Gateway.")
 
-	reader := bufio.NewReader(os.Stdin)
+	// Ouvrir directement le terminal au lieu d'utiliser os.Stdin
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return "", fmt.Errorf("impossible d'accéder au terminal : %w", err)
+	}
+	defer tty.Close()
+
+	reader := bufio.NewReader(tty)
 
 	for {
-		fmt.Print("URL du Gateway : ")
+		fmt.Fprint(tty, "URL du Gateway : ")
 
-		// Lecture avec gestion d'erreur améliorée
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			// Gestion spécifique des erreurs de lecture
-			if err.Error() == "unexpected newline" || strings.Contains(err.Error(), "newline") {
-				fmt.Println("❌ Saisie invalide. Veuillez réessayer.")
-				continue
-			}
 			return "", fmt.Errorf("erreur lors de la saisie du Gateway : %w", err)
 		}
 
 		gatewayURL := strings.TrimSpace(input)
 
-		// Validation de l'URL vide
 		if gatewayURL == "" {
-			fmt.Println("❌ L'URL du Gateway ne peut pas être vide. Veuillez réessayer.")
+			fmt.Fprintln(tty, "❌ L'URL du Gateway ne peut pas être vide. Veuillez réessayer.")
 			continue
 		}
 
@@ -116,16 +116,15 @@ func promptForGatewayURL() (string, error) {
 			gatewayURL = "http://" + gatewayURL
 		}
 
-		// Validation de l'URL avec le package net/url
+		// Validation de l'URL
 		parsedURL, err := url.Parse(gatewayURL)
 		if err != nil {
-			fmt.Printf("❌ URL invalide : %v. Veuillez réessayer.\n", err)
+			fmt.Fprintf(tty, "❌ URL invalide : %v. Veuillez réessayer.\n", err)
 			continue
 		}
 
-		// Vérification que l'URL contient un host valide
 		if parsedURL.Host == "" {
-			fmt.Println("❌ L'URL doit contenir un host valide. Veuillez réessayer.")
+			fmt.Fprintln(tty, "❌ L'URL doit contenir un host valide. Veuillez réessayer.")
 			continue
 		}
 
