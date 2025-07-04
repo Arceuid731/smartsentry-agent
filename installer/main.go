@@ -9,7 +9,7 @@ import (
 
 const (
 	// Version de l'OpenTelemetry Collector à utiliser
-	OTEL_VERSION = "0.128.0"
+	OTEL_VERSION = "0.129.0"
 
 	// Nom du service sur le système
 	SERVICE_NAME = "smartsentry-agent"

@@ -5,8 +5,18 @@ receivers:
   hostmetrics:
     collection_interval: 15s
     scrapers:
-      cpu: {}
-      memory: {}
+      cpu:
+        metrics:
+          system.cpu.time:
+            enabled: true
+          system.cpu.utilization:
+            enabled: true
+      memory:
+        metrics:
+          system.memory.usage:
+            enabled: true
+          system.memory.utilization:
+            enabled: true
       disk: {}
       filesystem:
         # Filtre pour ne garder que les FS pertinents (évite tmpfs, squashfs, etc.)
@@ -35,7 +45,7 @@ receivers:
         mute_process_io_error: true
       processes: {}
       # Scraper TCP connections (si supporté par ta version OTel)
-      tcp_connections: {}
+      # tcp_connections: {}
 
 processors:
   # Étape 1: Détecte automatiquement les attributs de l'hôte et environnement
@@ -74,9 +84,6 @@ processors:
       - key: host.cpu.physical.count
         from_attribute: "host.cpu.physical.count"
         action: upsert
-      - key: host.memory.total
-        from_attribute: "host.memory.total"
-        action: upsert
       # Ajoute d'autres attributs d'inventaire si exposés par OTel
 
   # Étape 3: Regroupe en lots
@@ -95,6 +102,20 @@ exporters:
     verbosity: detailed
 
 service:
+  # Configuration des logs pour le débogage
+  telemetry:
+    logs:
+      level: info
+      development: false
+      sampling:
+        initial: 5
+        thereafter: 200
+      output_paths:
+        - /var/log/smartsentry-agent/collector.log
+      error_output_paths:
+        - /var/log/smartsentry-agent/collector-error.log
+      encoding: json
+      
   # Pipeline enrichi avec détection avancée et inventaire
   pipelines:
     metrics:
