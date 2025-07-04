@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,29 +84,54 @@ func getDefaultConfigURL() string {
 // promptForGatewayURL demande à l'utilisateur l'adresse de son SmartSentry Gateway
 func promptForGatewayURL() (string, error) {
 	fmt.Println("\n🔧 Configuration du SmartSentry Gateway")
-	fmt.Println("Entrez l'adresse de votre SmartSentry Gateway (ex: http://192.168.1.100:30080)")
+	fmt.Println("Entrez l'adresse de votre SmartSentry Gateway (ex: http://192.168.1.211:4318)")
 	fmt.Println("Cette adresse correspond à l'IP de votre cluster k3s avec le port NodePort du Gateway.")
-	fmt.Print("URL du Gateway : ")
 
-	var gatewayURL string
-	_, err := fmt.Scanln(&gatewayURL)
-	if err != nil {
-		return "", fmt.Errorf("erreur lors de la lecture : %w", err)
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print("URL du Gateway : ")
+
+		// Lecture avec gestion d'erreur améliorée
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			// Gestion spécifique des erreurs de lecture
+			if err.Error() == "unexpected newline" || strings.Contains(err.Error(), "newline") {
+				fmt.Println("❌ Saisie invalide. Veuillez réessayer.")
+				continue
+			}
+			return "", fmt.Errorf("erreur lors de la saisie du Gateway : %w", err)
+		}
+
+		gatewayURL := strings.TrimSpace(input)
+
+		// Validation de l'URL vide
+		if gatewayURL == "" {
+			fmt.Println("❌ L'URL du Gateway ne peut pas être vide. Veuillez réessayer.")
+			continue
+		}
+
+		// Ajout automatique du schéma HTTP si absent
+		if !strings.HasPrefix(gatewayURL, "http://") && !strings.HasPrefix(gatewayURL, "https://") {
+			gatewayURL = "http://" + gatewayURL
+		}
+
+		// Validation de l'URL avec le package net/url
+		parsedURL, err := url.Parse(gatewayURL)
+		if err != nil {
+			fmt.Printf("❌ URL invalide : %v. Veuillez réessayer.\n", err)
+			continue
+		}
+
+		// Vérification que l'URL contient un host valide
+		if parsedURL.Host == "" {
+			fmt.Println("❌ L'URL doit contenir un host valide. Veuillez réessayer.")
+			continue
+		}
+
+		fmt.Printf("✅ Gateway configuré : %s\n", gatewayURL)
+		return gatewayURL, nil
 	}
-
-	// Validation basique de l'URL
-	gatewayURL = strings.TrimSpace(gatewayURL)
-	if gatewayURL == "" {
-		return "", fmt.Errorf("l'URL du Gateway ne peut pas être vide")
-	}
-
-	// Ajouter http:// si pas de schéma
-	if !strings.HasPrefix(gatewayURL, "http://") && !strings.HasPrefix(gatewayURL, "https://") {
-		gatewayURL = "http://" + gatewayURL
-	}
-
-	fmt.Printf("✅ Gateway configuré : %s\n", gatewayURL)
-	return gatewayURL, nil
 }
 
 // updateConfigWithGateway lit le fichier de config, remplace l'endpoint et le sauvegarde
