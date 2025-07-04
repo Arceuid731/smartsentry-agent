@@ -11,41 +11,114 @@ receivers:
             enabled: true
           system.cpu.utilization:
             enabled: true
+          system.cpu.logical.count:
+            enabled: true
+          system.cpu.physical.count:
+            enabled: true
+          system.cpu.frequency:
+            enabled: true
       memory:
         metrics:
           system.memory.usage:
             enabled: true
           system.memory.utilization:
             enabled: true
-      disk: {}
+          system.memory.limit:
+            enabled: true
+      disk:
+        metrics:
+          system.disk.io:
+            enabled: true
+          system.disk.operations:
+            enabled: true
+          system.disk.io_time:
+            enabled: true
+          system.disk.operation_time:
+            enabled: true
+          system.disk.pending_operations:
+            enabled: true
+          system.disk.merged:
+            enabled: true
+          system.disk.weighted_io_time:
+            enabled: true
       filesystem:
-        # Filtre pour ne garder que les FS pertinents (évite tmpfs, squashfs, etc.)
+        metrics:
+          system.filesystem.usage:
+            enabled: true
+          system.filesystem.utilization:
+            enabled: true
+          system.filesystem.inodes.usage:
+            enabled: true
         include_fs_types:
           match_type: strict
-          fs_types: [ "ext4", "xfs", "btrfs", "zfs" ]
+          fs_types: ["ext4", "xfs", "btrfs", "zfs", "vfat", "ntfs"]
+        exclude_mount_points:
+          match_type: regexp
+          mount_points: ["^/(dev|proc|sys|var/lib/docker/.+)($|/)", "^/snap/"]
+      load:
+        metrics:
+          system.cpu.load_average.1m:
+            enabled: true
+          system.cpu.load_average.5m:
+            enabled: true
+          system.cpu.load_average.15m:
+            enabled: true
       network:
-        # Inclut toutes les interfaces physiques (adapter selon infra)
+        metrics:
+          system.network.dropped:
+            enabled: true
+          system.network.packets:
+            enabled: true
+          system.network.errors:
+            enabled: true
+          system.network.io:
+            enabled: true
+          system.network.connections:
+            enabled: true
         include:
           match_type: regexp
-          interfaces: [ "^(eth|enp|ens|eno|wlan|bond|br|docker).*" ]
-      load: {}
-      paging: {}
-      process:
-        # Collecte fine par process (nécessite droits sur /proc)
-        resource_attributes:
-          process.owner:
-            enabled: true
+          interfaces: ["^(eth|enp|ens|eno|wlan|bond|br|docker).*"]
+      paging:
         metrics:
+          system.paging.usage:
+            enabled: true
+          system.paging.utilization:
+            enabled: true
+          system.paging.faults:
+            enabled: true
+          system.paging.operations:
+            enabled: true
+      process:
+        metrics:
+          process.cpu.time:
+            enabled: true
+          process.cpu.utilization:
+            enabled: true
           process.memory.usage:
+            enabled: true
+          process.memory.virtual:
+            enabled: true
+          process.memory.utilization:
             enabled: true
           process.disk.io:
             enabled: true
-        mute_process_name_error: true
+          process.threads:
+            enabled: true
+          process.open_file_descriptors:
+            enabled: true
+          process.signals_pending:
+            enabled: true
+          process.context_switches:
+            enabled: true
+        mute_process_user_error: true
         mute_process_exe_error: true
         mute_process_io_error: true
-      processes: {}
-      # Scraper TCP connections (si supporté par ta version OTel)
-      # tcp_connections: {}
+      processes:
+        metrics:
+          system.processes.count:
+            enabled: true
+          system.processes.created:
+            enabled: true
 
 processors:
   # Étape 1: Détecte automatiquement les attributs de l'hôte et environnement
@@ -56,35 +129,94 @@ processors:
   # Étape 2: Enrichissement complet des attributs de ressource
   resource:
     attributes:
+      # Service attributes
       - key: service.name
         value: "smartsentry.agent.linux"
         action: insert
       - key: service.instance.id
         from_attribute: "host.name"
         action: insert
-      # Enrichissement inventaire matériel
+      - key: service.version
+        value: "1.0.0"
+        action: insert
+      - key: service.namespace
+        value: "smartsentry"
+        action: insert
+      
+      # Host attributes (tous les standards disponibles)
       - key: host.name
         from_attribute: "host.name"
         action: upsert
       - key: host.id
         from_attribute: "host.id"
         action: upsert
-      - key: host.arch
-        from_attribute: "host.arch"
+      - key: host.type
+        from_attribute: "host.type"
         action: upsert
+      - key: host.image.name
+        from_attribute: "host.image.name"
+        action: upsert
+      - key: host.image.version
+        from_attribute: "host.image.version"
+        action: upsert
+      - key: host.ip
+        from_attribute: "host.ip"
+        action: upsert
+      - key: host.mac
+        from_attribute: "host.mac"
+        action: upsert
+      
+      # OS attributes (complets)
       - key: os.type
         from_attribute: "os.type"
+        action: upsert
+      - key: os.name
+        from_attribute: "os.name"
         action: upsert
       - key: os.version
         from_attribute: "os.version"
         action: upsert
-      - key: host.cpu.logical.count
-        from_attribute: "host.cpu.logical.count"
+      - key: os.description
+        from_attribute: "os.description"
         action: upsert
-      - key: host.cpu.physical.count
-        from_attribute: "host.cpu.physical.count"
+      - key: os.build_id
+        from_attribute: "os.build_id"
         action: upsert
-      # Ajoute d'autres attributs d'inventaire si exposés par OTel
+      
+      # Process attributes (pour l'inventaire détaillé)
+      - key: process.pid
+        from_attribute: "process.pid"
+        action: upsert
+      - key: process.parent_pid
+        from_attribute: "process.parent_pid"
+        action: upsert
+      - key: process.executable.name
+        from_attribute: "process.executable.name"
+        action: upsert
+      - key: process.executable.path
+        from_attribute: "process.executable.path"
+        action: upsert
+      - key: process.command
+        from_attribute: "process.command"
+        action: upsert
+      - key: process.command_line
+        from_attribute: "process.command_line"
+        action: upsert
+      - key: process.command_args
+        from_attribute: "process.command_args"
+        action: upsert
+      - key: process.owner
+        from_attribute: "process.owner"
+        action: upsert
+      - key: process.runtime.name
+        from_attribute: "process.runtime.name"
+        action: upsert
+      - key: process.runtime.version
+        from_attribute: "process.runtime.version"
+        action: upsert
+      - key: process.runtime.description
+        from_attribute: "process.runtime.description"
+        action: upsert
 
   # Étape 3: Regroupe en lots
   batch:
@@ -94,6 +226,12 @@ processors:
 exporters:
   otlphttp:
     endpoint: http://192.168.1.211:4318
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
     tls:
       insecure: true
 
