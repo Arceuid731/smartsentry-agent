@@ -5,8 +5,8 @@
 ### Résumé des modifications
 
 #### 1. Mise à jour de la version OpenTelemetry Collector
-- **Version précédente** : 0.128.0
-- **Version actuelle** : 0.129.0
+- **Version précédente** : 0.129.0
+- **Version actuelle** : 0.129.1
 - **Distribution** : opentelemetry-collector-contrib
 - **Fichier modifié** : `installer/main.go`
 
