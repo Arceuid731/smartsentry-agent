@@ -3,7 +3,7 @@
 
 receivers:
   hostmetrics:
-    collection_interval: 15s
+    collection_interval: 30s
     scrapers:
       cpu:
         metrics:
@@ -142,7 +142,7 @@ processors:
       - key: service.namespace
         value: "smartsentry"
         action: insert
-      
+
       # Host attributes (tous les standards disponibles)
       - key: host.name
         from_attribute: "host.name"
@@ -165,7 +165,7 @@ processors:
       - key: host.mac
         from_attribute: "host.mac"
         action: upsert
-      
+
       # OS attributes (complets)
       - key: os.type
         from_attribute: "os.type"
@@ -182,7 +182,7 @@ processors:
       - key: os.build_id
         from_attribute: "os.build_id"
         action: upsert
-      
+
       # Process attributes (pour l'inventaire détaillé)
       - key: process.pid
         from_attribute: "process.pid"
@@ -237,7 +237,7 @@ exporters:
 
   # Exportateur de debug pour validation
   debug:
-    verbosity: detailed
+    verbosity: basic
 
 service:
   # Configuration des logs pour le débogage
@@ -253,7 +253,7 @@ service:
       error_output_paths:
         - /var/log/smartsentry-agent/collector-error.log
       encoding: json
-      
+
   # Pipeline enrichi avec détection avancée et inventaire
   pipelines:
     metrics:
